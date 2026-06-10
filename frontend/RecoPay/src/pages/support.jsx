@@ -154,6 +154,7 @@ function Support() {
 
             <h2>Your Tickets</h2>
 
+            <div className="table-responsive">
             <table>
                 <thead>
                     <tr>
@@ -195,6 +196,7 @@ function Support() {
                     )}
                 </tbody>
             </table>
+            </div>
 
         </div>
     );

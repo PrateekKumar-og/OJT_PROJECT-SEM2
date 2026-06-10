@@ -139,6 +139,11 @@
 }
 
 /* ── TABLE ── */
+.table-responsive {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
 .support-container table {
     width: 100%;
     border-collapse: collapse;

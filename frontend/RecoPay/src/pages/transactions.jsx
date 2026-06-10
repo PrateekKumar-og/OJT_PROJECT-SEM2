@@ -87,6 +87,7 @@ function Transactions() {
             {filtered.length === 0 ? (
                 <p>No transactions found</p>
             ) : (
+                <div className="table-responsive">
                 <table>
                     <thead>
                         <tr>
@@ -131,6 +132,7 @@ function Transactions() {
                         ))}
                     </tbody>
                 </table>
+                </div>
             )}
         </div>
     );

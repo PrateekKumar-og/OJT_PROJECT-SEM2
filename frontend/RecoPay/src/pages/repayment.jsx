@@ -90,7 +90,8 @@ function Repayment() {
                     No loans yet — apply for a loan first
                 </p>
             ) : (
-                <table>
+                <div className="table-responsive">
+                    <table>
                     <thead>
                         <tr>
                             <th>Type</th>
@@ -169,6 +170,7 @@ function Repayment() {
                         })}
                     </tbody>
                 </table>
+                </div>
             )}
         </div>
     );

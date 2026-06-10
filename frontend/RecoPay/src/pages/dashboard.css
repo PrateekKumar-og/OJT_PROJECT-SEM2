@@ -8,6 +8,11 @@
     background: var(--bg-base);
 }
 
+/* ── MOBILE HEADER ── */
+.mobile-header {
+    display: none;
+}
+
 /* ── SIDEBAR ── */
 .sidebar {
     width: 250px;
@@ -198,16 +203,70 @@
         flex-direction: column;
     }
 
-    .sidebar {
-        width: 100%;
-        height: auto;
-        position: relative;
-        flex-direction: row;
-        overflow-x: auto;
-        padding: 10px 12px;
-        gap: 4px;
-        border-right: none;
+    .mobile-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 16px 20px;
+        background: var(--bg-primary);
         border-bottom: 1px solid var(--border-color);
+        position: sticky;
+        top: 0;
+        z-index: 100;
+    }
+
+    .mobile-logo {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .mobile-logo h2 {
+        margin: 0;
+        font-size: 20px;
+        font-weight: 800;
+        color: var(--text-primary);
+        letter-spacing: -0.3px;
+    }
+
+    .logo-icon {
+        width: 28px;
+        height: 28px;
+        background: linear-gradient(135deg, var(--primary), var(--accent-cyan));
+        border-radius: 8px;
+        flex-shrink: 0;
+    }
+
+    .hamburger-btn {
+        background: transparent;
+        border: none;
+        color: var(--text-primary);
+        cursor: pointer;
+        padding: 4px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .sidebar {
+        position: fixed;
+        top: 61px;
+        left: -100%;
+        width: 250px;
+        height: calc(100vh - 61px);
+        flex-direction: column;
+        border-right: 1px solid var(--border-color);
+        border-bottom: none;
+        padding: 20px 16px;
+        transition: left 0.3s ease;
+        z-index: 99;
+        background: var(--bg-primary);
+        overflow-y: auto;
+    }
+
+    .sidebar.open {
+        left: 0;
+        box-shadow: 4px 0 24px rgba(0,0,0,0.1);
     }
 
     .sidebar h2 {
@@ -215,14 +274,14 @@
     }
 
     .sidebar a {
-        white-space: nowrap;
-        padding: 8px 14px;
-        font-size: 13px;
+        white-space: normal;
+        padding: 12px 16px;
+        font-size: 14px;
     }
 
     .sidebar-toggle,
     .sidebar-user {
-        display: none;
+        display: flex;
     }
 
     .main {
