@@ -5,11 +5,13 @@ import {
     resolveTicket
 } from "../controllers/ticket.controller.js";
 import { protect } from "../middleware/authMiddleware.js";
+import validate from "../middleware/validate.js";
+import { ticketSchema } from "../validators/ticket.validator.js";
 
 const router = express.Router();
 
-// CREATE
-router.post("/", protect, createTicket);
+// CREATE (validated)
+router.post("/", protect, validate(ticketSchema), createTicket);
 
 // GET ALL
 router.get("/", protect, getTickets);
