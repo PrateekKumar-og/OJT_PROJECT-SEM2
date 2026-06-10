@@ -18,7 +18,7 @@ function Login() {
     };
 
     // ── LOGIN ──
-    const handleLogin = (e) => {
+    const handleLogin = async (e) => {
         e.preventDefault();
 
         if (!form.email || !form.password) {
@@ -26,21 +26,17 @@ function Login() {
             return;
         }
 
-        // Check registered users
-        const users = JSON.parse(localStorage.getItem("recopay_users") || "[]");
-        const found = users.find(u => u.email === form.email && u.password === form.password);
-
-        if (found) {
-            login(found);
+        try {
+            await login({ email: form.email, password: form.password });
             toast.success("Welcome back! 👋");
             navigate("/dashboard");
-        } else {
-            toast.error("Invalid email or password");
+        } catch (error) {
+            toast.error(error.message || "Invalid email or password");
         }
     };
 
     // ── SIGNUP ──
-    const handleSignup = (e) => {
+    const handleSignup = async (e) => {
         e.preventDefault();
 
         if (!form.name || !form.email || !form.password) {
@@ -53,23 +49,17 @@ function Login() {
             return;
         }
 
-        // Check if already exists
-        const users = JSON.parse(localStorage.getItem("recopay_users") || "[]");
-        if (users.find(u => u.email === form.email)) {
-            toast.error("Account already exists. Please login.");
-            return;
+        try {
+            await signup({
+                name: form.name,
+                email: form.email,
+                password: form.password
+            });
+            toast.success("Account created successfully! 🎉");
+            navigate("/dashboard");
+        } catch (error) {
+            toast.error(error.message || "Signup failed");
         }
-
-        signup({
-            name: form.name,
-            email: form.email,
-            password: form.password,
-            method: "manual",
-            avatar: form.name.charAt(0).toUpperCase()
-        });
-
-        toast.success("Account created successfully! 🎉");
-        navigate("/dashboard");
     };
 
     // ── REAL GOOGLE LOGIN with Account Chooser ──
@@ -82,7 +72,7 @@ function Login() {
                 });
                 const userInfo = await res.json();
 
-                loginWithGoogle({
+                await loginWithGoogle({
                     name: userInfo.name,
                     email: userInfo.email,
                     picture: userInfo.picture,

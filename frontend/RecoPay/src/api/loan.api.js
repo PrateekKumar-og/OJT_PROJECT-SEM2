@@ -2,9 +2,16 @@ const API_URL = "https://recopay.onrender.com/api";
 
 // RETRY WRAPPER — Render free tier sleeps, so retry on failure
 const fetchWithRetry = async (url, options = {}, retries = 3) => {
+    const token = localStorage.getItem("recopay_token");
+    const headers = {
+        ...options.headers,
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    };
+    const finalOptions = { ...options, headers };
+
     for (let i = 0; i < retries; i++) {
         try {
-            const res = await fetch(url, options);
+            const res = await fetch(url, finalOptions);
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             return res;
         } catch (err) {

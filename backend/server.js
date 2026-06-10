@@ -4,6 +4,7 @@ import dotenv from "dotenv";
 import connectDB from "./config/db.js";
 
 // ROUTES
+import authRoutes from "./routes/auth.routes.js";
 import loanRoutes from "./routes/loan.routes.js";
 import ticketRoutes from "./routes/ticket.routes.js";
 
@@ -24,6 +25,7 @@ app.get("/", (req, res) => {
 connectDB();
 
 // ROUTES
+app.use("/api/auth", authRoutes);
 app.use("/api/loans", loanRoutes);
 app.use("/api/tickets", ticketRoutes);
 

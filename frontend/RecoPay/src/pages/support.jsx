@@ -18,7 +18,12 @@ function Support() {
 
     const fetchTickets = async () => {
         try {
-            const res = await fetch(`${API_URL}/tickets`);
+            const token = localStorage.getItem("recopay_token");
+            const res = await fetch(`${API_URL}/tickets`, {
+                headers: {
+                    ...(token ? { Authorization: `Bearer ${token}` } : {})
+                }
+            });
             if (!res.ok) throw new Error("Failed to fetch tickets");
             const data = await res.json();
             setTickets(data);
@@ -45,9 +50,13 @@ function Support() {
         setLoading(true);
 
         try {
+            const token = localStorage.getItem("recopay_token");
             const res = await fetch(`${API_URL}/tickets`, {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: { 
+                    "Content-Type": "application/json",
+                    ...(token ? { Authorization: `Bearer ${token}` } : {})
+                },
                 body: JSON.stringify(form)
             });
 
@@ -74,8 +83,12 @@ function Support() {
 
     const handleResolve = async (id) => {
         try {
+            const token = localStorage.getItem("recopay_token");
             const res = await fetch(`${API_URL}/tickets/${id}`, {
-                method: "PUT"
+                method: "PUT",
+                headers: {
+                    ...(token ? { Authorization: `Bearer ${token}` } : {})
+                }
             });
 
             if (!res.ok) throw new Error("Failed to resolve ticket");
