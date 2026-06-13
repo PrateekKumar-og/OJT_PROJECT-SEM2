@@ -1,5 +1,6 @@
 import Loan from "../models/loan.js";
 import Transaction from "../models/transaction.js";
+import logger from "../utils/logger.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HELPERS
@@ -56,10 +57,10 @@ function generateSchedule(principal, emi, months) {
     return schedule;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────────
 // CREATE LOAN
-// ─────────────────────────────────────────────────────────────────────────────
-export const createLoan = async (req, res) => {
+// ─────────────────────────────────────────────────────────────────────────────────
+export const createLoan = async (req, res, next) => {
     try {
         const { type, amount, duration, purpose, userEmail } = req.body;
 
@@ -84,17 +85,18 @@ export const createLoan = async (req, res) => {
         });
 
         // No disbursement transaction yet — created on Approve/Disburse
+        logger.info("Loan created", { loanId: loan._id, userEmail, type, amount: principal });
         res.status(201).json(loan);
 
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        next(error);
     }
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────────
 // GET LOANS (filtered by userEmail)
-// ─────────────────────────────────────────────────────────────────────────────
-export const getLoans = async (req, res) => {
+// ─────────────────────────────────────────────────────────────────────────────────
+export const getLoans = async (req, res, next) => {
     try {
         const { email, page = 1, limit = 1000 } = req.query;
         const filter = email ? { userEmail: email } : {};
@@ -116,59 +118,55 @@ export const getLoans = async (req, res) => {
             totalPages: Math.ceil(total / limitNum)
         });
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        next(error);
     }
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
 // APPROVE LOAN  (Pending → Approved)
 // ─────────────────────────────────────────────────────────────────────────────
-export const approveLoan = async (req, res) => {
+export const approveLoan = async (req, res, next) => {
     try {
         const { id } = req.params;
         const loan = await Loan.findById(id);
 
-        if (!loan) return res.status(404).json({ message: "Loan not found" });
+        if (!loan) return res.status(404).json({ success: false, status: 404, message: "Loan not found" });
         if (loan.status !== "Pending") {
-            return res.status(400).json({ message: `Loan cannot be approved from status: ${loan.status}` });
+            return res.status(400).json({ success: false, status: 400, message: `Loan cannot be approved from status: ${loan.status}` });
         }
 
         loan.status = "Approved";
         await loan.save();
 
-        // Send mock notification
-        console.log(`[NOTIFICATION]: Loan ${id} for ${loan.userEmail} has been APPROVED.`);
-
+        logger.info("Loan approved", { loanId: id, userEmail: loan.userEmail });
         res.status(200).json(loan);
 
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        next(error);
     }
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
 // REJECT LOAN  (Pending → Rejected)
 // ─────────────────────────────────────────────────────────────────────────────
-export const rejectLoan = async (req, res) => {
+export const rejectLoan = async (req, res, next) => {
     try {
         const { id } = req.params;
         const loan = await Loan.findById(id);
 
-        if (!loan) return res.status(404).json({ message: "Loan not found" });
+        if (!loan) return res.status(404).json({ success: false, status: 404, message: "Loan not found" });
         if (loan.status !== "Pending") {
-            return res.status(400).json({ message: `Loan cannot be rejected from status: ${loan.status}` });
+            return res.status(400).json({ success: false, status: 400, message: `Loan cannot be rejected from status: ${loan.status}` });
         }
 
         loan.status = "Rejected";
         await loan.save();
 
-        // Send mock notification
-        console.log(`[NOTIFICATION]: Loan ${id} for ${loan.userEmail} has been REJECTED.`);
-
+        logger.info("Loan rejected", { loanId: id, userEmail: loan.userEmail });
         res.status(200).json(loan);
 
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        next(error);
     }
 };
 
@@ -176,14 +174,14 @@ export const rejectLoan = async (req, res) => {
 // DISBURSE LOAN  (Approved → Active)
 // Simulates fund disbursement; creates a "Loan Disbursed" transaction.
 // ─────────────────────────────────────────────────────────────────────────────
-export const disburseLoan = async (req, res) => {
+export const disburseLoan = async (req, res, next) => {
     try {
         const { id } = req.params;
         const loan = await Loan.findById(id);
 
-        if (!loan) return res.status(404).json({ message: "Loan not found" });
+        if (!loan) return res.status(404).json({ success: false, status: 404, message: "Loan not found" });
         if (loan.status !== "Approved") {
-            return res.status(400).json({ message: `Loan cannot be disbursed from status: ${loan.status}` });
+            return res.status(400).json({ success: false, status: 400, message: `Loan cannot be disbursed from status: ${loan.status}` });
         }
 
         loan.status = "Active";
@@ -199,10 +197,11 @@ export const disburseLoan = async (req, res) => {
             category:  "Disbursement"
         });
 
+        logger.info("Loan disbursed", { loanId: id, userEmail: loan.userEmail, amount: loan.amount });
         res.status(200).json(loan);
 
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        next(error);
     }
 };
 
@@ -210,14 +209,14 @@ export const disburseLoan = async (req, res) => {
 // PAY EMI  (PATCH /:id)
 // Uses stored emiAmount; marks the next pending installment as Paid.
 // ─────────────────────────────────────────────────────────────────────────────
-export const updateLoan = async (req, res) => {
+export const updateLoan = async (req, res, next) => {
     try {
         const { id } = req.params;
         const loan = await Loan.findById(id);
 
-        if (!loan) return res.status(404).json({ message: "Loan not found" });
+        if (!loan) return res.status(404).json({ success: false, status: 404, message: "Loan not found" });
         if (loan.status !== "Active") {
-            return res.status(400).json({ message: "Only Active loans can receive EMI payments" });
+            return res.status(400).json({ success: false, status: 400, message: "Only Active loans can receive EMI payments" });
         }
 
         // Use stored EMI; fall back to flat division for legacy loans
@@ -255,22 +254,23 @@ export const updateLoan = async (req, res) => {
             category:  "EMI Payment"
         });
 
+        logger.info("EMI paid", { loanId: id, emi, newPaid, status: loan.status });
         res.status(200).json(loan);
 
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        next(error);
     }
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
 // DELETE LOAN
 // ─────────────────────────────────────────────────────────────────────────────
-export const deleteLoan = async (req, res) => {
+export const deleteLoan = async (req, res, next) => {
     try {
         const { id } = req.params;
         const loan = await Loan.findByIdAndDelete(id);
 
-        if (!loan) return res.status(404).json({ message: "Loan not found" });
+        if (!loan) return res.status(404).json({ success: false, status: 404, message: "Loan not found" });
 
         const remainingAmount = loan.amount - (loan.paid || 0);
         if (remainingAmount > 0) {
@@ -283,9 +283,10 @@ export const deleteLoan = async (req, res) => {
             });
         }
 
+        logger.info("Loan deleted", { loanId: id, userEmail: loan.userEmail });
         res.status(200).json({ message: "Loan deleted", loan });
 
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        next(error);
     }
 };

@@ -2,6 +2,7 @@ import Razorpay from "razorpay";
 import crypto from "crypto";
 import Loan from "../models/loan.js";
 import Transaction from "../models/transaction.js";
+import logger from "../utils/logger.js";
 
 const getRazorpayInstance = () => {
     return new Razorpay({
@@ -60,25 +61,25 @@ async function applyEMI(loan, paymentId) {
 // POST /api/payments/order
 // Creates a Razorpay order for an EMI payment
 // ─────────────────────────────────────────────────────────────────────────────
-export const createOrder = async (req, res) => {
+export const createOrder = async (req, res, next) => {
     try {
         const { loanId } = req.body;
 
         if (!loanId) {
-            return res.status(400).json({ message: "loanId is required" });
+            return res.status(400).json({ success: false, status: 400, message: "loanId is required" });
         }
 
         const loan = await Loan.findById(loanId);
         if (!loan) {
-            return res.status(404).json({ message: "Loan not found" });
+            return res.status(404).json({ success: false, status: 404, message: "Loan not found" });
         }
 
         if (loan.status !== "Active") {
-            return res.status(400).json({ message: "Only Active loans can receive EMI payments" });
+            return res.status(400).json({ success: false, status: 400, message: "Only Active loans can receive EMI payments" });
         }
 
         if ((loan.paid || 0) >= loan.amount) {
-            return res.status(400).json({ message: "Loan is already fully paid" });
+            return res.status(400).json({ success: false, status: 400, message: "Loan is already fully paid" });
         }
 
         // Use stored EMI amount (with interest); fall back for legacy loans
@@ -98,6 +99,7 @@ export const createOrder = async (req, res) => {
             }
         });
 
+        logger.info("Razorpay order created", { orderId: order.id, loanId, emi });
         res.status(200).json({
             orderId:  order.id,
             amount:   order.amount,
@@ -108,8 +110,7 @@ export const createOrder = async (req, res) => {
         });
 
     } catch (error) {
-        console.error("createOrder error:", error);
-        res.status(500).json({ message: error.message });
+        next(error);
     }
 };
 
@@ -117,7 +118,7 @@ export const createOrder = async (req, res) => {
 // POST /api/payments/verify
 // Verifies Razorpay signature, then applies EMI via shared applyEMI()
 // ─────────────────────────────────────────────────────────────────────────────
-export const verifyPayment = async (req, res) => {
+export const verifyPayment = async (req, res, next) => {
     try {
         const {
             razorpay_order_id,
@@ -127,7 +128,7 @@ export const verifyPayment = async (req, res) => {
         } = req.body;
 
         if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature || !loanId) {
-            return res.status(400).json({ message: "Missing payment verification fields" });
+            return res.status(400).json({ success: false, status: 400, message: "Missing payment verification fields" });
         }
 
         // Cryptographic signature verification
@@ -138,22 +139,22 @@ export const verifyPayment = async (req, res) => {
             .digest("hex");
 
         if (expectedSignature !== razorpay_signature) {
-            return res.status(400).json({ message: "Payment signature verification failed" });
+            return res.status(400).json({ success: false, status: 400, message: "Payment signature verification failed" });
         }
 
         // Signature valid — apply the EMI using shared logic
         const loan = await Loan.findById(loanId);
         if (!loan) {
-            return res.status(404).json({ message: "Loan not found" });
+            return res.status(404).json({ success: false, status: 404, message: "Loan not found" });
         }
 
         const { emi, newPaid } = await applyEMI(loan, razorpay_payment_id);
 
+        logger.info("Payment verified and EMI applied", { loanId, emi, newPaid, paymentId: razorpay_payment_id });
         res.status(200).json({ message: "Payment verified and EMI applied", loan, emi, newPaid });
 
     } catch (error) {
-        console.error("verifyPayment error:", error);
-        res.status(500).json({ message: error.message });
+        next(error);
     }
 };
 
@@ -162,7 +163,7 @@ export const verifyPayment = async (req, res) => {
 // Razorpay webhook listener — fallback for async payment events
 // Also uses shared applyEMI() to avoid duplication (Issue #13 fix)
 // ─────────────────────────────────────────────────────────────────────────────
-export const webhookListener = async (req, res) => {
+export const webhookListener = async (req, res, next) => {
     try {
         const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET;
         const signature = req.headers["x-razorpay-signature"];
@@ -174,7 +175,7 @@ export const webhookListener = async (req, res) => {
                 .digest("hex");
 
             if (expectedSignature !== signature) {
-                return res.status(400).json({ message: "Invalid webhook signature" });
+                return res.status(400).json({ success: false, status: 400, message: "Invalid webhook signature" });
             }
         }
 
@@ -190,7 +191,7 @@ export const webhookListener = async (req, res) => {
                 // Only apply if not already processed by the verify route
                 if (loan && loan.lastPaymentId !== paymentId) {
                     await applyEMI(loan, paymentId);
-                    console.log(`Webhook: EMI applied to loan ${loanId} via payment ${paymentId}`);
+                    logger.info("Webhook: EMI applied", { loanId, paymentId });
                 }
             }
         }
@@ -198,7 +199,6 @@ export const webhookListener = async (req, res) => {
         res.status(200).json({ received: true });
 
     } catch (error) {
-        console.error("webhookListener error:", error);
-        res.status(500).json({ message: error.message });
+        next(error);
     }
 };

@@ -1,5 +1,6 @@
 import jwt from "jsonwebtoken";
 import User from "../models/user.js";
+import logger from "../utils/logger.js";
 
 // Generate JWT
 const generateToken = (id) => {
@@ -10,18 +11,15 @@ const generateToken = (id) => {
 
 // @desc    Register new user
 // @route   POST /api/auth/signup
-export const signup = async (req, res) => {
+export const signup = async (req, res, next) => {
     try {
         const { name, email, password, avatar } = req.body;
 
-        // Check if user exists
         const userExists = await User.findOne({ email });
-
         if (userExists) {
-            return res.status(400).json({ message: "User already exists" });
+            return res.status(400).json({ success: false, status: 400, message: "User already exists" });
         }
 
-        // Create user (password hashing is done in pre-save hook)
         const user = await User.create({
             name,
             email,
@@ -31,6 +29,7 @@ export const signup = async (req, res) => {
         });
 
         if (user) {
+            logger.info("User registered", { userId: user._id, email });
             res.status(201).json({
                 _id: user.id,
                 name: user.name,
@@ -40,23 +39,23 @@ export const signup = async (req, res) => {
                 token: generateToken(user._id),
             });
         } else {
-            res.status(400).json({ message: "Invalid user data" });
+            res.status(400).json({ success: false, status: 400, message: "Invalid user data" });
         }
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        next(error);
     }
 };
 
 // @desc    Authenticate a user
 // @route   POST /api/auth/login
-export const login = async (req, res) => {
+export const login = async (req, res, next) => {
     try {
         const { email, password } = req.body;
 
-        // Check for user email
         const user = await User.findOne({ email });
 
         if (user && user.method === "manual" && (await user.matchPassword(password))) {
+            logger.info("User logged in", { userId: user._id, email });
             res.json({
                 _id: user.id,
                 name: user.name,
@@ -66,23 +65,22 @@ export const login = async (req, res) => {
                 token: generateToken(user._id),
             });
         } else {
-            res.status(401).json({ message: "Invalid credentials" });
+            res.status(401).json({ success: false, status: 401, message: "Invalid credentials" });
         }
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        next(error);
     }
 };
 
 // @desc    Authenticate with Google
 // @route   POST /api/auth/google
-export const googleLogin = async (req, res) => {
+export const googleLogin = async (req, res, next) => {
     try {
         const { email, name, picture } = req.body;
 
         let user = await User.findOne({ email });
 
         if (!user) {
-            // Create user without password since they use Google
             user = await User.create({
                 name,
                 email,
@@ -91,6 +89,7 @@ export const googleLogin = async (req, res) => {
             });
         }
 
+        logger.info("Google login", { userId: user._id, email });
         res.json({
             _id: user.id,
             name: user.name,
@@ -100,6 +99,6 @@ export const googleLogin = async (req, res) => {
             token: generateToken(user._id),
         });
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        next(error);
     }
 };

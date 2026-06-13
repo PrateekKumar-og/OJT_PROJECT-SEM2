@@ -1,5 +1,6 @@
 import jwt from "jsonwebtoken";
 import User from "../models/user.js";
+import logger from "../utils/logger.js";
 
 const protect = async (req, res, next) => {
     let token;
@@ -12,7 +13,7 @@ const protect = async (req, res, next) => {
             // Get token from header
             token = req.headers.authorization.split(" ")[1];
 
-            // Verify token
+            // Verify token — JWT errors (invalid/expired) are caught and passed to errorHandler
             const decoded = jwt.verify(token, process.env.JWT_SECRET || "secret");
 
             // Get user from the token
@@ -20,13 +21,16 @@ const protect = async (req, res, next) => {
 
             next();
         } catch (error) {
-            console.error(error);
-            res.status(401).json({ message: "Not authorized" });
+            // Pass JWT errors (JsonWebTokenError, TokenExpiredError) to centralized handler
+            logger.warn("Auth token failed", { error: error.message });
+            next(error);
         }
+        return;
     }
 
     if (!token) {
-        res.status(401).json({ message: "Not authorized, no token" });
+        logger.warn("No auth token provided", { url: req.originalUrl });
+        res.status(401).json({ success: false, status: 401, message: "Not authorized, no token" });
     }
 };
 

@@ -1,7 +1,8 @@
 import Transaction from "../models/transaction.js";
+import logger from "../utils/logger.js";
 
 // GET TRANSACTIONS
-export const getTransactions = async (req, res) => {
+export const getTransactions = async (req, res, next) => {
     try {
         const { email, page = 1, limit = 1000 } = req.query;
         const userEmail = email || req.user.email;
@@ -23,18 +24,18 @@ export const getTransactions = async (req, res) => {
             totalPages: Math.ceil(total / limitNum)
         });
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        next(error);
     }
 };
 
 // CREATE TRANSACTION (Manual)
-export const createTransaction = async (req, res) => {
+export const createTransaction = async (req, res, next) => {
     try {
         const { type, amount, status, category, date, userEmail } = req.body;
         const email = userEmail || req.user.email;
 
         if (!type || amount === undefined || !status || !category) {
-            return res.status(400).json({ message: "type, amount, status, and category are required" });
+            return res.status(400).json({ success: false, status: 400, message: "type, amount, status, and category are required" });
         }
 
         const transaction = await Transaction.create({
@@ -46,8 +47,9 @@ export const createTransaction = async (req, res) => {
             date: date ? new Date(date) : Date.now()
         });
 
+        logger.info("Transaction created", { txId: transaction._id, userEmail: email, type, amount });
         res.status(201).json(transaction);
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        next(error);
     }
 };
